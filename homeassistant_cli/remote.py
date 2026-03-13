@@ -68,8 +68,6 @@ def restapi(
 
     if ctx.token:
         headers["Authorization"] = f"Bearer {ctx.token}"
-    if ctx.password:
-        headers["x-ha-access"] = ctx.password
 
     url = urllib.parse.urljoin(resolve_server(ctx) + path, "")
 
@@ -100,17 +98,30 @@ def wsapi(
 
     If no callback return data returned.
     """
-    loop = asyncio.get_event_loop()
-
     async def fetcher() -> Optional[Dict]:
         async with aiohttp.ClientSession() as session:
             async with session.ws_connect(
                 resolve_server(ctx) + "/api/websocket"
             ) as wsconn:
 
+                # Wait for auth_required before sending credentials
+                msg = await wsconn.receive()
+                first = json.loads(msg.data)
+                if first.get('type') != 'auth_required':
+                    raise HomeAssistantCliError(
+                        f"Unexpected WS message during handshake: {first}"
+                    )
+
                 await wsconn.send_str(
                     json.dumps({'type': 'auth', 'access_token': ctx.token})
                 )
+
+                msg = await wsconn.receive()
+                auth_result = json.loads(msg.data)
+                if auth_result.get('type') == 'auth_invalid':
+                    raise HomeAssistantCliError(
+                        auth_result.get('message', 'Authentication invalid')
+                    )
 
                 frame['id'] = 1
 
@@ -129,11 +140,9 @@ def wsapi(
                             callback(mydata)
                         elif mydata['type'] == 'result':
                             return mydata
-                        elif mydata['type'] == 'auth_invalid':
-                            raise HomeAssistantCliError(mydata.get('message'))
         return None
 
-    result = loop.run_until_complete(fetcher())
+    result = asyncio.run(fetcher())
     return result
 
 

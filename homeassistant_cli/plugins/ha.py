@@ -1,5 +1,5 @@
 """Home Assistant (former Hass.io) plugin for Home Assistant CLI (hass-cli)."""
-from distutils.version import StrictVersion
+from packaging.version import Version
 import json as json_
 import logging
 from typing import Any, Dict, List, cast  # noqa: F401
@@ -49,7 +49,6 @@ def _handle(ctx, method, httpmethod='get', raw=False) -> None:
     """Handle the data."""
     method = "/api/hassio/" + method
     response = api.restapi(ctx, httpmethod, method)
-    api.restapi(ctx, httpmethod, method)
 
     _report(ctx, httpmethod, method, response)
 
@@ -58,7 +57,6 @@ def _handle_raw(ctx, method, httpmethod='get') -> Dict:
     """Handle raw data."""
     method = "/api/hassio/" + method
     response = api.restapi(ctx, httpmethod, method)
-    api.restapi(ctx, httpmethod, method)
     return response.json()
 
 
@@ -135,25 +133,18 @@ def supervisor_stats(ctx: Configuration):
     _handle(ctx, 'supervisor/stats')
 
 
-@cli.group('snapshot')
+@cli.group('backup')
 @pass_context
-def snapshot(ctx: Configuration):
-    """Home Assistant snapshot commands."""
+def backup(ctx: Configuration):
+    """Home Assistant backup commands."""
     ctx.auto_output('data')
 
 
-@snapshot.command('reload')
+@backup.command('reload')
 @pass_context
-def snapshot_reload(ctx: Configuration):
-    """Home Assistant snapshots reload."""
-    _handle(ctx, 'snapshots/reload', 'post')
-
-
-@snapshot.command('shutdown')
-@pass_context
-def snapshot_shutdown(ctx: Configuration):
-    """Home Assistant host shutdown."""
-    _handle(ctx, 'host/shutdown', 'post')
+def backup_reload(ctx: Configuration):
+    """Home Assistant backups reload."""
+    _handle(ctx, 'backups/reload', 'post')
 
 
 @cli.group('host')
@@ -227,7 +218,7 @@ def os_update(ctx: Configuration):
     data = response['data']
     current_version = data['version']
     latest_version = data['version_latest']
-    if StrictVersion(current_version) == StrictVersion(latest_version):
+    if Version(current_version) == Version(latest_version):
         ctx.echo("Already running the latest release")
     else:
         try:
@@ -310,7 +301,7 @@ def core_update(ctx: Configuration):
     data = response['data']
     current_version = data['version']
     latest_version = data['version_latest']
-    if StrictVersion(current_version) == StrictVersion(latest_version):
+    if Version(current_version) == Version(latest_version):
         ctx.echo("Already running the latest release")
     else:
         try:

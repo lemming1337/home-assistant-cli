@@ -34,6 +34,12 @@ class _ZeroconfListener:
         """Add service."""
         self.services[name] = _zeroconf.get_service_info(_type, name)
 
+    def update_service(
+        self, _zeroconf: zeroconf.Zeroconf, _type: str, name: str
+    ) -> None:
+        """Update service."""
+        self.services[name] = _zeroconf.get_service_info(_type, name)
+
 
 def _locate_ha() -> Optional[str]:
     """Locate the Home Assistant instance."""
@@ -63,7 +69,13 @@ def _locate_ha() -> Optional[str]:
             return None
 
         _, service = listener.services.popitem()
-        base_url = service.properties[b'base_url'].decode('utf-8')
+        props = service.properties
+        if b'internal_url' in props:
+            base_url = props[b'internal_url'].decode('utf-8')
+        elif b'base_url' in props:
+            base_url = props[b'base_url'].decode('utf-8')
+        else:
+            base_url = f"http://{service.server.rstrip('.')}:{service.port}"
         _LOGGING.info("Found and using %s as server", base_url)
         return cast(str, base_url)
 
