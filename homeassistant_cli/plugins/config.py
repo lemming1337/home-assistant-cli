@@ -1,4 +1,6 @@
 """Configuration plugin for Home Assistant CLI (hass-cli)."""
+import sys
+
 import click
 
 from homeassistant_cli.cli import pass_context
@@ -22,7 +24,6 @@ COLUMNS_DETAILS = [
     ("LONGITUDE", "longitude"),
     ("LATITUDE", "latitude"),
     ("ELEVATION", "elevation"),
-    ("TZ", "time_zone"),
     ("UNITS", "unit_system"),
 ]
 
@@ -53,10 +54,20 @@ def components(ctx: Configuration):
     )
 
 
-@cli.command()
+@cli.command('allowlist_dirs')
 @pass_context
-def whitelist_dirs(ctx: Configuration):
-    """Get the whitelisted directories from Home Assistant."""
+def allowlist_dirs(ctx: Configuration):
+    """Get the allowlisted external directories from Home Assistant.
+
+    Displays the list of directories that Home Assistant is permitted to
+    access on the host filesystem.  The setting was renamed from
+    ``whitelist_external_dirs`` to ``allowlist_external_dirs`` in
+    Home Assistant 2022.9; both names are checked for backwards compatibility.
+
+    Example::
+
+        hass-cli config allowlist_dirs
+    """
     config_data = api.get_config(ctx)
     dirs = config_data.get('allowlist_external_dirs') or config_data.get(
         'whitelist_external_dirs', []
@@ -81,3 +92,37 @@ def release(ctx: Configuration):
             columns=ctx.columns if ctx.columns else [('VERSION', '$')],
         )
     )
+
+
+@cli.command()
+@pass_context
+def check(ctx: Configuration):
+    """Validate the configuration.yaml on the Home Assistant instance.
+
+    Triggers Home Assistant to check its configuration and reports whether
+    it is valid or not.  When the configuration contains errors the error
+    message is included in the output.
+
+    Exits with a non-zero status code when the configuration is invalid,
+    making it safe to use in CI/CD pipelines and shell scripts.
+
+    Example::
+
+        hass-cli config check
+        hass-cli config check && echo "Config is valid"
+    """
+    result = api.check_config(ctx)
+    is_valid = result.get('result') == 'valid'
+
+    click.echo(
+        format_output(
+            ctx,
+            [result],
+            columns=ctx.columns
+            if ctx.columns
+            else [('RESULT', 'result'), ('ERRORS', 'errors')],
+        )
+    )
+
+    if not is_valid:
+        sys.exit(1)

@@ -185,7 +185,7 @@ def host_info(ctx: Configuration):
 @host.command('options')
 @pass_context
 def host_options(ctx: Configuration):
-    """Home Assistant options shutdown."""
+    """Home Assistant host options."""
     _handle(ctx, 'host/options', 'post')
 
 
@@ -480,7 +480,7 @@ def multicast_restart(ctx: Configuration):
 @multicast.command('logs')
 @pass_context
 def multicast_logs(ctx: Configuration):
-    """Home Assistant DNS logs."""
+    """Home Assistant Multicast logs."""
     _handle(ctx, 'multicast/logs')
 
 
