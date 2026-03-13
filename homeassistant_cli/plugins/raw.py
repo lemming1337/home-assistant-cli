@@ -69,7 +69,7 @@ def post(ctx: Configuration, method, json):
 
     response = api.restapi(ctx, 'post', method, data)
 
-    _report(ctx, "GET", method, response)
+    _report(ctx, "POST", method, response)
 
 
 @cli.command("ws")

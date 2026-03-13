@@ -73,9 +73,9 @@ def restapi(
 
     try:
         if method == METH_GET:
-            return requests.get(url, params=data_str, headers=headers)
+            return ctx.session.get(url, params=data, headers=headers)
 
-        return requests.request(method, url, data=data_str, headers=headers)
+        return ctx.session.request(method, url, data=data_str, headers=headers)
 
     except requests.exceptions.ConnectionError:
         raise HomeAssistantCliError(f"Error connecting to {url}")
@@ -304,13 +304,13 @@ def get_entities(ctx: Configuration) -> List[Dict[str, Any]]:
     return devices
 
 
-def get_entity(ctx: Configuration, entity_id: str) -> List[Dict[str, Any]]:
-    """Return id."""
+def get_entity(ctx: Configuration, entity_id: str) -> Optional[Dict[str, Any]]:
+    """Return a single entity from the entity registry."""
     frame = {'type': hass.WS_TYPE_ENTITY_REGISTRY_GET, 'entity_id': entity_id}
 
-    result = cast(Dict[str, List[Dict[str, Any]]], wsapi(ctx, frame))
+    result = cast(Dict[str, Any], wsapi(ctx, frame))
 
-    return result['id']
+    return cast(Optional[Dict[str, Any]], result.get('result'))
 
 
 def validate_api(ctx: Configuration) -> APIStatus:
@@ -368,9 +368,9 @@ def get_history(
     """Return History."""
     try:
         if start_time:
-            method = hass.URL_API_HISTORY_PERIOD.format(start_time.isoformat())
+            method = f"{hass.URL_API_HISTORY_PERIOD}/{start_time.isoformat()}"
         else:
-            method = hass.URL_API_HISTORY
+            method = hass.URL_API_HISTORY_PERIOD
 
         params = collections.OrderedDict()  # type: Dict[str, str]
 
@@ -597,4 +597,132 @@ def get_services(
 
     raise HomeAssistantCliError(
         f"Error while getting all services: {req.text}"
+    )
+
+
+def get_logbook(
+    ctx: Configuration,
+    start_time: Optional[datetime] = None,
+    end_time: Optional[datetime] = None,
+    entity_id: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """Return logbook entries.
+
+    Args:
+        ctx: CLI configuration context.
+        start_time: Optional start of the query period. Defaults to 1 day ago.
+        end_time: Optional end of the query period.
+        entity_id: Optional entity_id to filter entries.
+
+    Returns:
+        List of logbook entry dicts with keys such as ``name``, ``message``,
+        ``entity_id``, ``state``, and ``when``.
+    """
+    if start_time:
+        path = f"{hass.URL_API_LOGBOOK}/{start_time.isoformat()}"
+    else:
+        path = hass.URL_API_LOGBOOK
+
+    params = {}  # type: Dict[str, str]
+    if end_time:
+        params["end_time"] = end_time.isoformat()
+    if entity_id:
+        params["entity"] = entity_id
+
+    if params:
+        path = f"{path}?{urlencode(params)}"
+
+    try:
+        req = restapi(ctx, METH_GET, path)
+    except HomeAssistantCliError as ex:
+        raise HomeAssistantCliError(f"Unexpected error getting logbook: {ex}")
+
+    if req.status_code == 200:
+        return cast(List[Dict[str, Any]], req.json())
+
+    raise HomeAssistantCliError(f"Error getting logbook: {req.text}")
+
+
+def get_calendars(ctx: Configuration) -> List[Dict[str, Any]]:
+    """Return all calendar entities.
+
+    Returns:
+        List of dicts each containing ``entity_id`` and ``name``.
+    """
+    try:
+        req = restapi(ctx, METH_GET, hass.URL_API_CALENDARS)
+    except HomeAssistantCliError as ex:
+        raise HomeAssistantCliError(
+            f"Unexpected error getting calendars: {ex}"
+        )
+
+    if req.status_code == 200:
+        return cast(List[Dict[str, Any]], req.json())
+
+    raise HomeAssistantCliError(f"Error getting calendars: {req.text}")
+
+
+def get_calendar_events(
+    ctx: Configuration,
+    calendar_entity_id: str,
+    start_time: datetime,
+    end_time: datetime,
+) -> List[Dict[str, Any]]:
+    """Return calendar events for a given entity within a time range.
+
+    Args:
+        ctx: CLI configuration context.
+        calendar_entity_id: The entity_id of the calendar (e.g.
+            ``calendar.my_calendar``).
+        start_time: Start of the queried time range (RFC3339 / ISO 8601).
+        end_time: End of the queried time range (RFC3339 / ISO 8601).
+
+    Returns:
+        List of event dicts with keys ``summary``, ``start``, ``end``, and
+        optionally ``description`` and ``location``.
+    """
+    params = {
+        "start": start_time.isoformat(),
+        "end": end_time.isoformat(),
+    }
+    path = (
+        f"{hass.URL_API_CALENDARS}/{calendar_entity_id}"
+        f"?{urlencode(params)}"
+    )
+
+    try:
+        req = restapi(ctx, METH_GET, path)
+    except HomeAssistantCliError as ex:
+        raise HomeAssistantCliError(
+            f"Unexpected error getting calendar events: {ex}"
+        )
+
+    if req.status_code == 200:
+        return cast(List[Dict[str, Any]], req.json())
+
+    raise HomeAssistantCliError(
+        f"Error getting calendar events for {calendar_entity_id}: {req.text}"
+    )
+
+
+def check_config(ctx: Configuration) -> Dict[str, Any]:
+    """Trigger a configuration check on the Home Assistant instance.
+
+    Returns:
+        Dict with ``result`` (either ``"valid"`` or ``"invalid"``) and an
+        optional ``errors`` key containing a human-readable error string when
+        the configuration is invalid.
+    """
+    try:
+        req = restapi(ctx, METH_POST, hass.URL_API_CONFIG_CHECK)
+    except HomeAssistantCliError as ex:
+        raise HomeAssistantCliError(
+            f"Unexpected error checking configuration: {ex}"
+        )
+
+    if req.status_code == 200:
+        return cast(Dict[str, Any], req.json())
+
+    raise HomeAssistantCliError(
+        f"Error checking configuration: {req.status_code} - {req.text}"
     )

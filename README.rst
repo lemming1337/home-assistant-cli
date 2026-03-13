@@ -33,7 +33,7 @@ The developers of `hass-cli` usually provide up-to-date `packages <https://src.f
 
    $ sudo  dnf -y install home-assistant-cli
 
-The community is providing support for macOS through `homebew <https://formulae.brew.sh/formula/homeassistant-cli#default>`_.
+The community is providing support for macOS through `homebrew <https://formulae.brew.sh/formula/homeassistant-cli#default>`_.
 
 .. code:: bash
 
@@ -329,6 +329,103 @@ by specifying it as an argument:
 
    $ hass-cli event watch deconz_event
 
+You can also fire custom events:
+
+.. code:: bash
+
+   $ hass-cli event fire my_custom_event --json='{"source": "cli"}'
+
+
+Logbook
+-------
+
+The logbook tracks state changes and domain events. Retrieve recent entries
+with ``system logbook``:
+
+.. code:: bash
+
+   $ hass-cli system logbook
+   WHEN                              NAME              MESSAGE              ENTITY                    STATE
+   2024-03-01T08:00:00+00:00         Office Light      turned on            light.office_light        on
+   2024-03-01T08:45:00+00:00         Office Light      turned off           light.office_light        off
+   [...]
+
+Filter by entity and time range using ``--since`` and ``--end``:
+
+.. code:: bash
+
+   $ hass-cli system logbook sensor.temperature --since 6h
+   $ hass-cli system logbook --since 2024-01-01 --end 2024-01-02
+
+
+Calendars
+---------
+
+List all calendar entities known to Home Assistant:
+
+.. code:: bash
+
+   $ hass-cli calendar list
+   ENTITY_ID                  NAME
+   calendar.work              Work
+   calendar.holidays          Public Holidays
+
+Show upcoming events for a calendar within a time window (defaults to
+the next 7 days):
+
+.. code:: bash
+
+   $ hass-cli calendar events calendar.work
+   SUMMARY          START                        END
+   Team meeting     2024-03-04T10:00:00+00:00    2024-03-04T11:00:00+00:00
+   Sprint review    2024-03-07T14:00:00+00:00    2024-03-07T15:00:00+00:00
+
+Narrow the window with ``--since`` and ``--end``:
+
+.. code:: bash
+
+   $ hass-cli calendar events calendar.holidays --since 2024-06-01 --end 2024-06-30
+
+
+Configuration
+-------------
+
+Validate the ``configuration.yaml`` without restarting Home Assistant:
+
+.. code:: bash
+
+   $ hass-cli config check
+   RESULT    ERRORS
+   valid
+
+   $ hass-cli config check
+   RESULT    ERRORS
+   invalid   Integration 'sensor 2' can't be loaded: ...
+
+The command exits with a non-zero status when the configuration is invalid,
+making it usable in scripts:
+
+.. code:: bash
+
+   $ hass-cli config check && hass-cli ha core restart
+
+List the allowlisted external directories:
+
+.. code:: bash
+
+   $ hass-cli config allowlist_dirs
+   DIRECTORY
+   /tmp/ha_share
+   /media/nas
+
+Get the currently running Home Assistant release:
+
+.. code:: bash
+
+   $ hass-cli config release
+   VERSION
+   2024.3.1
+
 
 Home Assistant (former Hass.io)
 -------------------------------
@@ -493,6 +590,7 @@ Help
 
     Commands:
       area        Get info and operate on areas from Home Assistant...
+      calendar    Interact with calendar entities in Home Assistant.
       completion  Output shell completion code for the specified shell (bash or...
       config      Get configuration from a Home Assistant instance.
       device      Get info and operate on devices from Home Assistant...
