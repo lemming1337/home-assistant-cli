@@ -57,10 +57,14 @@ def components(ctx: Configuration):
 @pass_context
 def whitelist_dirs(ctx: Configuration):
     """Get the whitelisted directories from Home Assistant."""
+    config_data = api.get_config(ctx)
+    dirs = config_data.get('allowlist_external_dirs') or config_data.get(
+        'whitelist_external_dirs', []
+    )
     click.echo(
         format_output(
             ctx,
-            api.get_config(ctx)['whitelist_external_dirs'],
+            dirs,
             columns=ctx.columns if ctx.columns else [('DIRECTORY', '$')],
         )
     )
